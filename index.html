@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>تشغيل الكاميرا</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 520px;
+      margin: 40px auto;
+      padding: 16px;
+      text-align: center;
+      background-color: #121212;
+      color: #ffffff;
+    }
+    button {
+      padding: 10px 18px;
+      margin: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+    }
+    #startBtn {
+      background-color: #2ea043;
+      color: #fff;
+    }
+    #stopBtn {
+      background-color: #da3633;
+      color: #fff;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    video {
+      width: 100%;
+      margin-top: 16px;
+      border-radius: 10px;
+      background: #000;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>واجهة الكاميرا</h2>
+  <p>اضغط على الزر لطلب إذن فتح الكاميرا من المتصفح.</p>
+
+  <button id="startBtn">فتح الكاميرا</button>
+  <button id="stopBtn" disabled>إيقاف الكاميرا</button>
+
+  <p id="status"></p>
+  <video id="video" autoplay playsinline></video>
+
+  <script>
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const statusEl = document.getElementById("status");
+    const videoEl = document.getElementById("video");
+
+    let activeStream = null;
+
+    startBtn.addEventListener("click", async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        statusEl.textContent = "المتصفح لا يدعم الكاميرا أو الرابط ليس HTTPS.";
+        return;
+      }
+
+      try {
+        statusEl.textContent = "يرجى الرد على نافذة السماح في المتصفح...";
+        activeStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
+        });
+
+        videoEl.srcObject = activeStream;
+        videoEl.style.display = "block";
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        statusEl.textContent = "الكاميرا قيد التشغيل.";
+      } catch (error) {
+        statusEl.textContent = "لم يتم تشغيل الكاميرا: " + error.message;
+      }
+    });
+
+    stopBtn.addEventListener("click", () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+        activeStream = null;
+      }
+      videoEl.srcObject = null;
+      videoEl.style.display = "none";
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      statusEl.textContent = "تم إيقاف الكاميرا.";
+    });
+  </script>
+</body>
+</html>
