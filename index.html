@@ -3,98 +3,141 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>تشغيل الكاميرا</title>
+  <title>التقاط الصورة وإرسالها لواتساب</title>
   <style>
     body {
-      font-family: sans-serif;
-      max-width: 520px;
-      margin: 40px auto;
-      padding: 16px;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      gap: 14px;
       text-align: center;
-      background-color: #121212;
-      color: #ffffff;
+    }
+    video, img {
+      width: 100%;
+      max-width: 380px;
+      border-radius: 12px;
+      background: #000;
+    }
+    img {
+      display: none;
+      border: 2px solid #2ea043;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
     }
     button {
-      padding: 10px 18px;
-      margin: 6px;
-      font-size: 16px;
-      cursor: pointer;
+      padding: 11px 18px;
+      font-size: 15px;
       border: none;
-      border-radius: 6px;
-    }
-    #startBtn {
-      background-color: #2ea043;
+      border-radius: 8px;
+      cursor: pointer;
       color: #fff;
     }
-    #stopBtn {
-      background-color: #da3633;
-      color: #fff;
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    video {
-      width: 100%;
-      margin-top: 16px;
-      border-radius: 10px;
-      background: #000;
-      display: none;
-    }
+    #startBtn { background: #1f6feb; }
+    #snapBtn  { background: #2ea043; }
+    #status   { font-size: 14px; color: #ccc; max-width: 380px; }
   </style>
 </head>
 <body>
-  <h2>واجهة الكاميرا</h2>
-  <p>اضغط على الزر لطلب إذن فتح الكاميرا من المتصفح.</p>
-
-  <button id="startBtn">فتح الكاميرا</button>
-  <button id="stopBtn" disabled>إيقاف الكاميرا</button>
-
-  <p id="status"></p>
+  <div id="status">اضغط على "تشغيل الكاميرا" للبدء</div>
   <video id="video" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <img id="preview" alt="معاينة الصورة الملتقطة" />
+
+  <div class="actions">
+    <button id="startBtn" type="button">تشغيل الكاميرا</button>
+    <button id="snapBtn" type="button" disabled>التقاط وإرسال لواتساب</button>
+  </div>
 
   <script>
-    const startBtn = document.getElementById("startBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const statusEl = document.getElementById("status");
-    const videoEl = document.getElementById("video");
+    const TARGET_WHATSAPP = '0984492456';
+    const BACKEND_URL     = 'https://YOUR_BACKEND_URL/send-whatsapp'; // ضع رابط الخدمة الخلفية هنا
 
-    let activeStream = null;
+    const video    = document.getElementById('video');
+    const canvas   = document.getElementById('canvas');
+    const preview  = document.getElementById('preview');
+    const statusEl = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const snapBtn  = document.getElementById('snapBtn');
 
-    startBtn.addEventListener("click", async () => {
+    let streamRef = null;
+
+    async function startCamera() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        statusEl.textContent = "المتصفح لا يدعم الكاميرا أو الرابط ليس HTTPS.";
+        statusEl.textContent = 'المتصفح لا يدعم الكاميرا أو الاتصال غير آمن (HTTPS مطلوب).';
+        return;
+      }
+      try {
+        statusEl.textContent = 'جاري طلب إذن الكاميرا...';
+        streamRef = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: false
+        });
+        video.srcObject = streamRef;
+        snapBtn.disabled = false;
+        statusEl.textContent = 'الكاميرا جاهزة. اضغط "التقاط وإرسال لواتساب".';
+      } catch (err) {
+        statusEl.textContent = 'تم رفض الإذن أو تعذر فتح الكاميرا.';
+      }
+    }
+
+    function captureAndSend() {
+      if (!video.videoWidth || !video.videoHeight) {
+        statusEl.textContent = 'الكاميرا لم تجهز بعد، حاول مجدداً.';
         return;
       }
 
-      try {
-        statusEl.textContent = "يرجى الرد على نافذة السماح في المتصفح...";
-        activeStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-          audio: false
-        });
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        videoEl.srcObject = activeStream;
-        videoEl.style.display = "block";
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        statusEl.textContent = "الكاميرا قيد التشغيل.";
-      } catch (error) {
-        statusEl.textContent = "لم يتم تشغيل الكاميرا: " + error.message;
-      }
-    });
+      preview.src = canvas.toDataURL('image/jpeg', 0.9);
+      preview.style.display = 'block';
 
-    stopBtn.addEventListener("click", () => {
-      if (activeStream) {
-        activeStream.getTracks().forEach(track => track.stop());
-        activeStream = null;
-      }
-      videoEl.srcObject = null;
-      videoEl.style.display = "none";
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-      statusEl.textContent = "تم إيقاف الكاميرا.";
-    });
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          statusEl.textContent = 'تعذر تجهيز ملف الصورة.';
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('photo', blob, 'capture.jpg');
+        formData.append('phone', TARGET_WHATSAPP);
+
+        statusEl.textContent = `جاري إرسال الصورة إلى الرقم ${TARGET_WHATSAPP}...`;
+        try {
+          const res = await fetch(BACKEND_URL, {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!res.ok) {
+            throw new Error('فشل الاستجابة من الخادم: ' + res.status);
+          }
+
+          statusEl.textContent = `تم التقاط الصورة وإرسالها إلى ${TARGET_WHATSAPP} بنجاح.`;
+          if (streamRef) {
+            streamRef.getTracks().forEach(track => track.stop());
+          }
+        } catch (err) {
+          statusEl.textContent = 'تعذر الإرسال، تأكد من رابط الخدمة الخلفية وإعدادات CORS.';
+        }
+      }, 'image/jpeg', 0.9);
+    }
+
+    startBtn.addEventListener('click', startCamera);
+    snapBtn.addEventListener('click', captureAndSend);
   </script>
 </body>
 </html>
